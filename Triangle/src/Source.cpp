@@ -108,7 +108,7 @@ int main(void)
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
         
-        
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glUseProgram(pene);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         
@@ -121,6 +121,7 @@ int main(void)
     }
 
     glDeleteBuffers(1, &VBO);
+    glDeleteBuffers(1, &EBO);
     glfwTerminate();
     return 0;
 }
