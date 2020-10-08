@@ -6,23 +6,27 @@
 #include <GLFW/glfw3.h>
 #include <string>
 
-unsigned int VBO, EBO;
+unsigned int VBO, VAO;
 
 std::string vShader =
 "#version 330 core\n"
 "layout (location = 0) in vec3 position;\n"
-"void main()"
-"{"
-"gl_Position = vec4(position.x, position.y, position.z, 1.0);"
-"}";
+"layout (location = 1) in vec3 color;\n"
+"out vec3 ourColor;\n"
+"void main()\n"
+"{\n"
+"gl_Position = vec4(position, 1.0);\n"
+"ourColor = color;\n"
+"}\0";
 
 std::string fShader =
 "#version 330 core\n"
+"in vec3 ourColor;\n"
 "out vec4 color;\n"
 "void main()\n"
 "{\n"
-"color = vec4(1.0f, 0.0f, 0.0f, 1.0f);\n"
-"}\n";
+"color = vec4(ourColor, 1.0f);\n"
+"}\n\0";;
 
 int shaderProgram()
 {
@@ -31,10 +35,26 @@ int shaderProgram()
     glShaderSource(vShaderContenedor, 1, &vsrc, NULL);
     glCompileShader(vShaderContenedor);
 
+    GLint success;
+    GLchar infoLog[512];
+    glGetShaderiv(vShaderContenedor, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        glGetShaderInfoLog(vShaderContenedor, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
+
     unsigned int fShaderContenedor = glCreateShader(GL_FRAGMENT_SHADER);
     const char* fsrc = fShader.c_str();
     glShaderSource(fShaderContenedor, 1, &fsrc, NULL);
     glCompileShader(fShaderContenedor);
+
+    glGetShaderiv(fShaderContenedor, GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        glGetShaderInfoLog(fShaderContenedor, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+    }
 
     int program = glCreateProgram();
 
@@ -43,35 +63,40 @@ int shaderProgram()
 
     glLinkProgram(program);
 
+    glGetProgramiv(program, GL_LINK_STATUS, &success);
+    if (!success) {
+        glGetProgramInfoLog(program, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+    }
+
     return program;
 }
 
 void VertexBufferObject()
 {
-    float vertices[]{
-        -0.5f, -0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-         0.5f,  0.5f, 0.0f,
-        -0.5f,  0.5f, 0.0f
+    GLfloat vertices[] = {
+        // Positions         // Colors
+         0.5f, -0.5f, 0.0f,  1.0f, 1.0f, 1.0f,  // Bottom Right
+        -0.5f, -0.5f, 0.0f,  0.5f, 1.0f, 0.0f,  // Bottom Left
+         0.0f,  0.5f, 0.0f,  0.0f, 0.0f, 1.0f   // Top 
     };
     
-    unsigned int indices[]{
-        0, 1, 2,
-        0, 2, 3
-    };
-    
+    glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
+    // Bind the Vertex Array Object first, then bind and set vertex buffer(s) and attribute pointer(s).
+    glBindVertexArray(VAO);
+
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, 4 * 3 * sizeof(float), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glGenBuffers(1, &EBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
-
+    // Position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), NULL);
     glEnableVertexAttribArray(0);
+    // Color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0); // Unbind VAO
 }
 
 int main(void)
@@ -83,7 +108,7 @@ int main(void)
         return -1;
 
     /* Create a windowed mode window and its OpenGL context */
-    window = glfwCreateWindow(640, 480, "No es un Hello World pelotudo", NULL, NULL);
+    window = glfwCreateWindow(640, 480, "esto no es un word pelotudo", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -101,17 +126,19 @@ int main(void)
     VertexBufferObject();
 
     int pene = shaderProgram();
-    
+  
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
         
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glUseProgram(pene);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         
+        glUseProgram(pene);
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glBindVertexArray(0);
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
@@ -120,8 +147,7 @@ int main(void)
         glfwPollEvents();
     }
 
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    
     glfwTerminate();
     return 0;
 }
